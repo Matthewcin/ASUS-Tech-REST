@@ -35,17 +35,28 @@ class ComputadoraModel {
     $actualizar->execute([$modelo, $descripcion, $precio, $categoria_id, $img, $id]);
     }
 
-    function ordenarComputadoras($order = 'DESC'){
-    $order = strtoupper($order);
-    if($order !== 'ASC' && $order !== 'DESC') {
-        $order = 'DESC';
+   public function ordenarComputadoras($categoria_id, $orderBy, $order, $limit) { // ARREGLADO
+    $query = $this->db->prepare("SELECT * FROM notebooks");
+    $params = [];
+
+    // Aca filtro por Categorias
+    if ($categoria_id != null) {
+        $query .= " WHERE categoria_id = ?";
+        $params[] = $categoria_id;
     }
 
-    $query = $this->db->prepare("SELECT * FROM notebooks ORDER BY precio $order");
-    $query->execute();
+    // Ordeno
+    $query .= " ORDER BY $orderBy $order";
 
+    // Aca Limito
+    if ($limit != null) {
+        $query .= " LIMIT $limit";
+    }
+
+    $query = $this->db->prepare($query); // dependiendo lo que usó el usuario ejecuto los parametros utilizados
+    $query->execute($params);
     return $query->fetchAll(PDO::FETCH_OBJ);
-    }
+}
 
     function paginarProductos($limit){
         if(!is_numeric($limit)) return false; // SI EL LIMIT NO ES UN NUMERO ENTONCES NO HACER NADA
