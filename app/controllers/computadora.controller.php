@@ -12,45 +12,27 @@ class ComputadoraController {
         $this->modelCategorias = new categoriasModel();
     }
 
-    public function obtenerComputadorasYfiltrar($req, $res) { 
-    // Si el usuario NO envió categoria_id, entonces considéralo como no filtrado osea null 
-    $limit = $req->query->limit ?? null;
-    $categoria_id = $req->query->categoria_id ?? null;
-    $order = $req->query->orderBy ?? null;
+   public function obtenerComputadorasYfiltrar($req, $res) { // ARREGLADO <--
+    // Obtengo los paramotros requeridos y si no existen dejo con ?? los default
+    $orderBy = $req->query->orderBy ?? 'id'; // si el usuario no setea que tipo de orderBy, sera por ID de Notebooks
+    $order = $req->query->order ?? 'ASC'; // Si el usuario no setea el order, entonces será siempre ASCENDENTE (de arriba para abajo)
+    $limit = $req->query->limit ?? null; // el limite puede ser null (osea todo)
+    $categoria_id = $req->query->categoria_id ?? null; // lo moismo que el limite
 
-    //$order pregunto si no esta vacio 
-    if($order && $order !== 'ASC' && $order !== 'DESC'){
-        return $res->json("El parámetro orderBy no puede estar vacio o debe ser ASC o DESC", 400);
+    $columnasPermitidas = ['id', 'modelo', 'precio', 'categoria_id'];
+    if (!in_array($orderBy, $columnasPermitidas)) {
+        $orderBy = 'id'; // si el usuario manda algo que no es, por defecto será id
     }
 
-    if ($categoria_id) {
-    $validarCategoria = $this->modelCategorias->obtenerCategoriaPorId($categoria_id);
-    $obtenerComputadoras = count($this->modelCategorias->obtenerComputadorasPorCategoria($categoria_id));
-    if(!$validarCategoria || $obtenerComputadoras < 1) {
-        return $res->json("la categoria no existe o no hay computadoras en la categoria",404); 
+    // aca valido que sea DESC o ASC unicamente, y ademas el strtoupper lo que hace es PONERLO EN MAYUSCULAS
+    if (strtoupper($order) !== 'DESC') {
+        $order = 'ASC';
     }
+
+    $computadoras = $this->modelComputadoras->ordenarComputadoras($categoria_id, $orderBy, $order, $limit);
+
+    return $res->json($computadoras, 200);
 }
-
-    // Si hay categoria + order
-    if ($categoria_id && $order) {
-        $computadoras = $this->modelCategorias->obtenerComputadorasPorCategoriaOrdenado($categoria_id, $order);
-        return $res->json($computadoras);
-        //si solo hay categoria
-    }else if ($categoria_id ) {
-        $computadoras = $this->modelCategorias->obtenerComputadorasPorCategoria($categoria_id);
-        // si solo hay orden
-    }else if ($order) {
-        $computadoras = $this->modelComputadoras->ordenarComputadoras($order);
-    }else {
-        // si no hay filtros, traemos todas
-        $computadoras = $this->modelComputadoras->obtenerComputadoras();
-    }
-    // Aplicar limit si existe
-    if ($limit) {
-    $computadoras = array_slice($computadoras, 0, $limit);
-    }
-    return $res->json($computadoras);
-    }
 
     public function obtenerComputadoraPorID($req, $res) {
         $id = $req->params->id;
@@ -65,6 +47,11 @@ class ComputadoraController {
 
     public function agregarComputadora($req, $res) {
         if(!verificarCredencialesAPI($req,$res)) return;
+
+        if (!isset($req->body) || $req->body === null) { // AGREGUE ESTO POR SI EL USUARIO NO ENVIA BIEN EL BODY VIA POST
+        return $res->json("el json enviado por el body esta mal hecho o vacio", 400);
+    }
+
         if (empty($req->body->modelo) || empty($req->body->descripcion) || empty($req->body->precio) || empty($req->body->categoria_id) || empty($req->body->imagen)) {
             return $res->json("error Faltan datos obligatorios", 400);
         }
